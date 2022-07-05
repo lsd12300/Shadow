@@ -63,6 +63,7 @@
         Pass
         {
             Tags { "LightMode" = "Depth"  "RenderPipeline" = "UniversalPipeline" }
+            ColorMask 0
 
 
             HLSLPROGRAM
@@ -99,9 +100,15 @@
 
             half4 frag(v2f i) : SV_Target
             {
-                half4 col = half4(i.screenPos.z / i.screenPos.w, 0, 0, 1);
-                //half4 col = half4(1, 0, 0, 1);
-                return col;
+                //float depth = i.screenPos.z / i.screenPos.w;
+                //#if UNITY_REVERSED_Z
+                //#else
+                //    depth = 1.0 - depth;
+                //#endif
+                //half4 col = half4(depth, 0, 0, 1);
+                //return col;
+
+                return 0;
             }
             ENDHLSL
         }

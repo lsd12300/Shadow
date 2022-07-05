@@ -111,4 +111,20 @@ public class LogEditor
     static Matrix4x4 mt2 = new Matrix4x4(new Vector4(0.15378f, 0, 0, 0), new Vector4(0, 0.08989f, 0, 0), new Vector4(0, 0, -0.11936f, 0), new Vector4(0, -1.69924f, -1, 1));
 
 
+
+    [MenuItem("GameObject/LogTestMatrix", false, 10)]
+    static void LogTestMatrix()
+    {
+        Matrix4x4 mt = new Matrix4x4(
+            new Vector4(1f, 0f, 0f, 0f),
+            new Vector4(0f, 1f, 0f, 0f),
+            new Vector4(0f, 0f, 1f, 0f),
+            new Vector4(0f, 0f, 0f, 1f)
+        );
+        Matrix4x4 scalePosMt = Matrix4x4.TRS(new Vector3(0.5f, 0.5f, 0f), Quaternion.identity, new Vector3(0.5f, 0.5f, 1f));
+        mt = mt * scalePosMt;
+        Vector3 pos = new Vector3(0.5f, 0.5f, 0f);
+
+        Debug.LogError($"{mt.MultiplyPoint3x4(pos)},  {scalePosMt},  {mt}");
+    }
 }

@@ -15,6 +15,7 @@ namespace Shadow.CSM
 
         public int CascadeCount { get; set; } = 1;      // 视野划分数量
         public int CascadeSplitType { get; set; } = 2;
+        public Vector2Int ShadowMapSize { get; set; }
 
         private float[] m_frustumPercents = { 0.07f, 0.13f, 0.25f, 0.55f };     // 视锥体分割参数.   Unity 默认为 {0.067f, 0.133f, 0.267f, 0.533f}
         private float[] m_frustumSplitDises;
@@ -30,10 +31,11 @@ namespace Shadow.CSM
 
         #region 方法
 
-        public CSM(Light l, Camera cam, int cascadeCount, int cascadeSpliteType)
+        public CSM(Light l, Camera cam, int cascadeCount, int cascadeSpliteType, Vector2Int shadowmapSize)
         {
             m_light = l;
             Cam = cam;
+            ShadowMapSize = shadowmapSize;
 
             CascadeCount = cascadeCount;
             CascadeSplitType = cascadeSpliteType;
@@ -81,13 +83,13 @@ namespace Shadow.CSM
                 {
                     m_camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), near, Camera.MonoOrStereoscopicEye.Mono, frustumFourCorners);
                     m_frustums[i].SetNearPlanePoints(frustumFourCorners, camLocal2World);
-
-                    m_frustums[i].m_debugCam = m_debugCam;
                 }
                 else
                 {
                     m_frustums[i].SetNearPlanePoints(m_frustums[i-1].m_farPlaneWorldPoints, Matrix4x4.identity);
                 }
+
+                //m_frustums[i].m_debugCam = m_debugCam;
 
                 m_camera.CalculateFrustumCorners(new Rect(0, 0, 1, 1), far, Camera.MonoOrStereoscopicEye.Mono, frustumFourCorners);
                 m_frustums[i].SetFarPlanePoints(frustumFourCorners, camLocal2World);
@@ -95,10 +97,12 @@ namespace Shadow.CSM
                 //Debug.LogError($"{i},  {frustumFourCorners[0]},  {frustumFourCorners[2]}");
 
                 // 2. AABB包围盒
-                //m_frustums[i].UpdateAABB(m_light.transform.worldToLocalMatrix);
+                m_frustums[i].UpdateAABB(m_light.transform.worldToLocalMatrix, ShadowMapSize);
 
                 // 2. 包围球
-                m_frustums[i].UpdateSphereBounding(m_camera.transform.position, m_camera.transform.forward, m_light.transform.rotation, m_light.transform.forward, m_camera.projectionMatrix);
+                //m_frustums[i].UpdateSphereBounding(m_camera.transform.position, m_camera.transform.forward,
+                //    m_light.transform.rotation, m_light.transform.forward, m_camera.projectionMatrix,
+                //    ShadowMapSize, m_light.transform.worldToLocalMatrix);
                 //if (m_debugCam != null && m_debugCam.transform.childCount >= 4)
                 //{
                 //    var sphere = m_debugCam.transform.GetChild(i);
@@ -182,7 +186,6 @@ namespace Shadow.CSM
             var aabbClrs = new Color[] { Color.red, Color.green, Color.blue, Color.yellow };
             var clrs = new Color[] { Color.red, Color.green, Color.blue, Color.yellow };
             for (int i = 0; i < m_frustums.Length; i++)
-            //for (int i = 0; i < 1; i++)
             {
                 m_frustums[i].DebugDrawFrustum(clrs[i], aabbClrs[i]);
             }

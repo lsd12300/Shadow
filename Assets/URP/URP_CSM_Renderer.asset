@@ -16,7 +16,7 @@ MonoBehaviour:
   m_renderSettings:
     renderEvt: 250
     shaderTag: Depth
-    perLevelTextureSize: 512
+    perLevelTextureSize: 1024
     cascadeCount: 4
     cascadeSplitType: 2
 --- !u!114 &11400000

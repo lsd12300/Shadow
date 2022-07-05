@@ -10,7 +10,7 @@
         Pass
         {
             Tags { "LightMode" = "UniversalForward"  "RenderPipeline" = "UniversalPipeline" }
-            Blend One Zero
+            //Blend One Zero
 
 
             HLSLPROGRAM
@@ -58,10 +58,16 @@
 
             half4 shadow_frag(v2f i) : SV_Target
             {
-                //float shadow = GetShadowAABB(i.worldPos);
-                float shadow = GetShadowSphere(i.worldPos);
                 half4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
-                col.rgb *= (1 - shadow);
+                float shadow = GetShadowAABB(i.worldPos);
+                //col.rgb *= (1-shadow);
+
+                //float shadow = GetShadowSphere(i.worldPos);
+                //col.rgb *= (1-shadow);
+
+
+                col.rgb *= shadow;
+
                 return col;
             }
 

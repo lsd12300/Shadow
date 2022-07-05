@@ -63,87 +63,96 @@ namespace Shadow.CSM
                 Debug.DrawLine(m_nearPlaneWorldPoints[i], m_farPlaneWorldPoints[i], clr);
             }
 
-            //for (int i = 0; i < len; i++)
-            //{
-            //    Debug.DrawLine(m_aabb[i], m_aabb[(i + 1) % len], aabbClr);
-            //    Debug.DrawLine(m_aabb[i + 4], m_aabb[((i + 1) % len) + 4], aabbClr);
-            //    Debug.DrawLine(m_aabb[i], m_aabb[i + 4], aabbClr);
-            //}
+            if (m_debugAABB != null && m_debugAABB.Length >= 8)
+            {
+                for (int i = 0; i < len; i++)
+                {
+                    Debug.DrawLine(m_debugAABB[i], m_debugAABB[(i + 1) % len], aabbClr);
+                    Debug.DrawLine(m_debugAABB[i + 4], m_debugAABB[((i + 1) % len) + 4], aabbClr);
+                    Debug.DrawLine(m_debugAABB[i], m_debugAABB[i + 4], aabbClr);
+                }
+            }
         }
 
 
 
         #region AABB 包围盒
 
-        public Vector3[] m_aabb;            // 包围盒世界坐标
         public float m_aabbZLen;            // 包围盒 Z轴长度
-        public void UpdateAABB(Matrix4x4 worldToLightLocal)
+        private Vector3 m_minXYZ;
+        private Vector3 m_maxXYZ;
+        public Vector3[] m_debugAABB;            // 包围盒世界坐标
+
+        public void UpdateAABB(Matrix4x4 worldToLightLocal, Vector2Int shadowMapSize)
         {
             // 光源空间下的 AABB包围盒
-            var minXYZ = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var maxXYZ = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            m_minXYZ = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            m_maxXYZ = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             foreach (var p in m_nearPlaneWorldPoints)
             {
                 var lightLocalPos = worldToLightLocal.MultiplyPoint3x4(p);
-                minXYZ.x = Mathf.Min(lightLocalPos.x, minXYZ.x);
-                minXYZ.y = Mathf.Min(lightLocalPos.y, minXYZ.y);
-                minXYZ.z = Mathf.Min(lightLocalPos.z, minXYZ.z);
-                maxXYZ.x = Mathf.Max(lightLocalPos.x, maxXYZ.x);
-                maxXYZ.y = Mathf.Max(lightLocalPos.y, maxXYZ.y);
-                maxXYZ.z = Mathf.Max(lightLocalPos.z, maxXYZ.z);
+                m_minXYZ.x = Mathf.Min(lightLocalPos.x, m_minXYZ.x);
+                m_minXYZ.y = Mathf.Min(lightLocalPos.y, m_minXYZ.y);
+                m_minXYZ.z = Mathf.Min(lightLocalPos.z, m_minXYZ.z);
+                m_maxXYZ.x = Mathf.Max(lightLocalPos.x, m_maxXYZ.x);
+                m_maxXYZ.y = Mathf.Max(lightLocalPos.y, m_maxXYZ.y);
+                m_maxXYZ.z = Mathf.Max(lightLocalPos.z, m_maxXYZ.z);
                 //Debug.LogError($"near:    {p},   {lightLocalPos}");
             }
             foreach (var p in m_farPlaneWorldPoints)
             {
                 var lightLocalPos = worldToLightLocal.MultiplyPoint3x4(p);
-                minXYZ.x = Mathf.Min(lightLocalPos.x, minXYZ.x);
-                minXYZ.y = Mathf.Min(lightLocalPos.y, minXYZ.y);
-                minXYZ.z = Mathf.Min(lightLocalPos.z, minXYZ.z);
-                maxXYZ.x = Mathf.Max(lightLocalPos.x, maxXYZ.x);
-                maxXYZ.y = Mathf.Max(lightLocalPos.y, maxXYZ.y);
-                maxXYZ.z = Mathf.Max(lightLocalPos.z, maxXYZ.z);
+                m_minXYZ.x = Mathf.Min(lightLocalPos.x, m_minXYZ.x);
+                m_minXYZ.y = Mathf.Min(lightLocalPos.y, m_minXYZ.y);
+                m_minXYZ.z = Mathf.Min(lightLocalPos.z, m_minXYZ.z);
+                m_maxXYZ.x = Mathf.Max(lightLocalPos.x, m_maxXYZ.x);
+                m_maxXYZ.y = Mathf.Max(lightLocalPos.y, m_maxXYZ.y);
+                m_maxXYZ.z = Mathf.Max(lightLocalPos.z, m_maxXYZ.z);
                 //Debug.LogError($"far:    {p},   {lightLocalPos}");
             }
 
-            //Debug.LogError($"{minXYZ},  {maxXYZ}");
+            // 消除相机移动时抖动 (https://zhuanlan.zhihu.com/p/116731971)
+            //   要保证两帧之间像素完全重合.  固定相机在 世界长度和阴影贴图长度比 的整数倍的位置
+            var maxDist = Mathf.Max(Vector3.Distance(m_nearPlaneWorldPoints[0], m_farPlaneWorldPoints[2]), Vector3.Distance(m_farPlaneWorldPoints[0], m_farPlaneWorldPoints[2]));
+            var worldUnitsPerTexel = maxDist / shadowMapSize.x * 2f;
 
-            // 外扩,   保证横截面为 正方形
-            //var dis = Mathf.Max(maxXYZ.x - minXYZ.x, maxXYZ.y - minXYZ.y);
-            //maxXYZ.x = minXYZ.x + dis;
-            //maxXYZ.y = minXYZ.y + dis;
+            var posX = (m_minXYZ.x + m_maxXYZ.x) * 0.5f;
+            posX = Mathf.FloorToInt(posX / worldUnitsPerTexel) * worldUnitsPerTexel;
 
-
-            if (m_aabb == null) m_aabb = new Vector3[8];
-
-            // 再变换到世界空间
-            var lightToWorldMt = worldToLightLocal.inverse;
-            m_aabb[0] = lightToWorldMt.MultiplyPoint3x4(new Vector3(minXYZ.x, maxXYZ.y, minXYZ.z));
-            m_aabb[1] = lightToWorldMt.MultiplyPoint3x4(new Vector3(maxXYZ.x, maxXYZ.y, minXYZ.z));
-            m_aabb[2] = lightToWorldMt.MultiplyPoint3x4(new Vector3(maxXYZ.x, minXYZ.y, minXYZ.z));
-            m_aabb[3] = lightToWorldMt.MultiplyPoint3x4(new Vector3(minXYZ.x, minXYZ.y, minXYZ.z));
-            m_aabb[4] = lightToWorldMt.MultiplyPoint3x4(new Vector3(minXYZ.x, maxXYZ.y, maxXYZ.z));
-            m_aabb[5] = lightToWorldMt.MultiplyPoint3x4(new Vector3(maxXYZ.x, maxXYZ.y, maxXYZ.z));
-            m_aabb[6] = lightToWorldMt.MultiplyPoint3x4(new Vector3(maxXYZ.x, minXYZ.y, maxXYZ.z));
-            m_aabb[7] = lightToWorldMt.MultiplyPoint3x4(new Vector3(minXYZ.x, minXYZ.y, maxXYZ.z));
+            var posY = (m_minXYZ.y + m_maxXYZ.y) * 0.5f;
+            posY = Mathf.FloorToInt(posY / worldUnitsPerTexel) * worldUnitsPerTexel;
 
 
-            m_aabbZLen = maxXYZ.z - minXYZ.z;
-            float w = Vector3.Magnitude(m_aabb[1] - m_aabb[0]);
-            float h = Vector3.Magnitude(m_aabb[1] - m_aabb[2]);
+            var center = worldToLightLocal.inverse.MultiplyPoint3x4(new Vector3(posX, posY, m_minXYZ.z));
+            m_aabbZLen = m_maxXYZ.z - m_minXYZ.z;
             var rotation = worldToLightLocal.rotation;
             rotation.Set(-rotation.x, -rotation.y, -rotation.z, rotation.w);
-            m_viewMt = Matrix4x4.TRS((m_aabb[3] + m_aabb[1]) * 0.5f, rotation, Vector3.one).inverse;
+            m_viewMt = Matrix4x4.TRS(center, rotation, Vector3.one).inverse;
             if (SystemInfo.usesReversedZBuffer) m_viewMt.SetRow(2, -1 * m_viewMt.GetRow(2));    // 第三行取反.  平台不同需要反转 Z(D3D近平面0, openGL近平面1)---C#(SystemInfo.usesReversedZBuffer), shader(UNITY_REVERSED_Z)
-            m_projMt = Matrix4x4.Ortho(-w * 0.5f, w * 0.5f, -h * 0.5f, h * 0.5f, 0, m_aabbZLen);
+            m_projMt = Matrix4x4.Ortho(-maxDist * 0.5f, maxDist * 0.5f, -maxDist * 0.5f, maxDist * 0.5f, 0, m_aabbZLen);
 
-            //if (m_debugCam != null)
-            //{
-            //    m_debugCam.transform.position = (m_aabb[3] + m_aabb[1]) * 0.5f;
-            //    m_debugCam.orthographicSize = h * 0.5f;
-            //    m_debugCam.nearClipPlane = 0;
-            //    m_debugCam.farClipPlane = m_aabbZLen;
-            //    m_debugCam.aspect = w / h;
-            //}
+            //Debug.LogError($"{maxDist}");
+
+            if (m_debugCam != null)
+            {
+                m_debugCam.transform.position = center;
+                m_debugCam.orthographicSize = maxDist * 0.5f;
+                m_debugCam.nearClipPlane = 0;
+                m_debugCam.farClipPlane = m_aabbZLen;
+                m_debugCam.aspect = 1;
+
+
+                if (m_debugAABB == null) m_debugAABB = new Vector3[8];
+                var lightToWorldMt = worldToLightLocal.inverse;
+                m_debugAABB[0] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX - maxDist * 0.5f, posY - maxDist * 0.5f, m_minXYZ.z));
+                m_debugAABB[1] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX - maxDist * 0.5f, posY + maxDist * 0.5f, m_minXYZ.z));
+                m_debugAABB[2] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX + maxDist * 0.5f, posY + maxDist * 0.5f, m_minXYZ.z));
+                m_debugAABB[3] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX + maxDist * 0.5f, posY - maxDist * 0.5f, m_minXYZ.z));
+                m_debugAABB[4] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX - maxDist * 0.5f, posY - maxDist * 0.5f, m_maxXYZ.z));
+                m_debugAABB[5] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX - maxDist * 0.5f, posY + maxDist * 0.5f, m_maxXYZ.z));
+                m_debugAABB[6] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX + maxDist * 0.5f, posY + maxDist * 0.5f, m_maxXYZ.z));
+                m_debugAABB[7] = lightToWorldMt.MultiplyPoint3x4(new Vector3(posX + maxDist * 0.5f, posY - maxDist * 0.5f, m_maxXYZ.z));
+            }
         }
         public static Matrix4x4 CountProjMatrix(Vector3 min, Vector3 max, float near, float far)
         {
@@ -173,7 +182,7 @@ namespace Shadow.CSM
         ///  计算视锥体的包围球.  参数 UE 源码  https://blog.csdn.net/ZJU_fish1996/article/details/116401362   DirectionalLightComponent.cpp
         /// </summary>
         /// <returns></returns>
-        public Vector4 BoundingSphere(Vector3 cameraPos, Vector3 cameraForward, Matrix4x4 cameraPorjMt)
+        public Vector4 BoundingSphere(Vector3 cameraPos, Vector3 cameraForward, Matrix4x4 cameraPorjMt, Vector2Int shadowMapSize)
         {
             //float aspectRatio = cameraPorjMt.m11 / cameraPorjMt.m00;
             float halfHorizontalFovTan = 1.0f / cameraPorjMt.m00;
@@ -206,9 +215,68 @@ namespace Shadow.CSM
             return new Vector4(m_boundingSphereCenter.x, m_boundingSphereCenter.y, m_boundingSphereCenter.z, m_boundingSphereR * m_boundingSphereR);
         }
 
-        public void UpdateSphereBounding(Vector3 cameraPos, Vector3 cameraForward, Quaternion lightRotation, Vector3 lightForward, Matrix4x4 cameraPorjMt)
+
+        /// <summary>
+        ///   克莱姆法则  空间四点确定球心
+        /// </summary>
+        public Vector4 BoundingSphere(Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4)
         {
-            m_boundingSphere = BoundingSphere(cameraPos, cameraForward, cameraPorjMt);
+            m_boundingSphereCenter = CramerRuleSphere(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z, p4.x, p4.y, p4.z);
+            m_boundingSphereR = Vector3.Distance(m_boundingSphereCenter, p1);
+            return new Vector4(m_boundingSphereCenter.x, m_boundingSphereCenter.y, m_boundingSphereCenter.z, m_boundingSphereR * m_boundingSphereR);
+        }
+
+        public Vector3 CramerRuleSphere(
+            float x1, float y1, float z1,
+            float x2, float y2, float z2,
+            float x3, float y3, float z3,
+            float x4, float y4, float z4)
+        {
+            float a11, a12, a13, a21, a22, a23, a31, a32, a33, b1, b2, b3, d, d1, d2, d3;
+            a11 = 2 * (x2 - x1); a12 = 2 * (y2 - y1); a13 = 2 * (z2 - z1);
+            a21 = 2 * (x3 - x2); a22 = 2 * (y3 - y2); a23 = 2 * (z3 - z2);
+            a31 = 2 * (x4 - x3); a32 = 2 * (y4 - y3); a33 = 2 * (z4 - z3);
+            b1 = x2 * x2 - x1 * x1 + y2 * y2 - y1 * y1 + z2 * z2 - z1 * z1;
+            b2 = x3 * x3 - x2 * x2 + y3 * y3 - y2 * y2 + z3 * z3 - z2 * z2;
+            b3 = x4 * x4 - x3 * x3 + y4 * y4 - y3 * y3 + z4 * z4 - z3 * z3;
+            d = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 - a11 * a23 * a32 - a12 * a21 * a33 - a13 * a22 * a31;
+            d1 = b1 * a22 * a33 + a12 * a23 * b3 + a13 * b2 * a32 - b1 * a23 * a32 - a12 * b2 * a33 - a13 * a22 * b3;
+            d2 = a11 * b2 * a33 + b1 * a23 * a31 + a13 * a21 * b3 - a11 * a23 * b3 - b1 * a21 * a33 - a13 * b2 * a31;
+            d3 = a11 * a22 * b3 + a12 * b2 * a31 + b1 * a21 * a32 - a11 * b2 * a32 - a12 * a21 * b3 - b1 * a22 * a31;
+            float x = d1 / d;
+            float y = d2 / d;
+            float z = d3 / d;
+            return new Vector3(x, y, z);
+        }
+
+
+
+
+        public void UpdateSphereBounding(Vector3 cameraPos, Vector3 cameraForward, 
+            Quaternion lightRotation, Vector3 lightForward, Matrix4x4 cameraPorjMt, Vector2Int shadowMapSize, Matrix4x4 worldToLightMT)
+        {
+            //m_boundingSphere = BoundingSphere(cameraPos, cameraForward, cameraPorjMt, shadowMapSize);
+            m_boundingSphere = BoundingSphere(m_nearPlaneWorldPoints[0], m_farPlaneWorldPoints[0], m_farPlaneWorldPoints[1], m_farPlaneWorldPoints[2]);
+
+
+            // 消除相机移动时抖动 (https://zhuanlan.zhihu.com/p/116731971)
+            //   要保证两帧之间像素完全重合.  固定相机在 世界长度和阴影贴图长度比 的整数倍的位置
+            var worldUnitsPerTexel = m_boundingSphereR * 2f / shadowMapSize.x * 2f;
+            var lightSpaceCenter = worldToLightMT.MultiplyPoint3x4(m_boundingSphereCenter);
+
+            var posX = lightSpaceCenter.x;
+            posX /= worldUnitsPerTexel;
+            posX = Mathf.FloorToInt(posX);
+            posX *= worldUnitsPerTexel;
+
+            var posY = lightSpaceCenter.y;
+            posY /= worldUnitsPerTexel;
+            posY = Mathf.FloorToInt(posY);
+            posY *= worldUnitsPerTexel;
+
+            m_boundingSphereCenter = worldToLightMT.inverse.MultiplyPoint3x4(new Vector3(posX, posY, lightSpaceCenter.z));
+            m_boundingSphere = new Vector4(m_boundingSphereCenter.x, m_boundingSphereCenter.y, m_boundingSphereCenter.z, m_boundingSphereR * m_boundingSphereR);
+
 
             var startPos = m_boundingSphereCenter - lightForward * m_boundingSphereR;       // 调整 光源正交视锥正好包括整个包围球
 
@@ -218,6 +286,8 @@ namespace Shadow.CSM
             if (SystemInfo.usesReversedZBuffer) m_viewMt.SetRow(2, -1 * m_viewMt.GetRow(2));    // 第三行取反.  平台不同需要反转 Z(D3D近平面0, openGL近平面1)---C#(SystemInfo.usesReversedZBuffer), shader(UNITY_REVERSED_Z)
 
             m_projMt = Matrix4x4.Ortho(-m_boundingSphereR, m_boundingSphereR, -m_boundingSphereR, m_boundingSphereR, 0, m_boundingSphereR * 2f);
+
+            //Debug.LogError($"{m_boundingSphereR * 2.0f}");
 
             if (m_debugCam != null)
             {

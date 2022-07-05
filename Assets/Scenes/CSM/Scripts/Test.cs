@@ -17,7 +17,7 @@ public class Test : MonoBehaviour
         //m_csm = new CSM(light, m_cam);
 
         //m_csm.m_debugCam = GameObject.Find("DebugCamera").GetComponent<Camera>();
-        
+
     }
 
 
